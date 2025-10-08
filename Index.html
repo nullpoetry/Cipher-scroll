@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aetheric Code Codex</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Theme Base Colors */
+            --deep-space: #0F0A1E;
+            --parchment-bg: #F8EEDB;
+            --text-dark: #333;
+            --codex-border: #7B3F00; /* Darker, richer brown for an antique scroll look */
+
+            /* Dynamic Color Variables (Default: Gold Theme) */
+            --primary-color: #FFC300; /* Gold */
+            --secondary-color: #40E0D0; /* Cyan */
+            --glow: 0 0 10px var(--primary-color), 0 0 20px rgba(255, 195, 0, 0.4);
+            --glyph-color: var(--primary-color);
+
+            /* Theme Class Definitions */
+            --bg-override: var(--deep-space);
+        }
+        
+        /* --- General Theme Overrides (for backgrounds) --- */
+        .theme-aetheric { /* Original Gold */
+            --primary-color: #FFC300; --secondary-color: #40E0D0;
+        }
+        .theme-rune { /* Crimson */
+            --primary-color: #CD5C5C; --secondary-color: #4B0082;
+        }
+        .theme-lunar { /* Azure */
+            --primary-color: #ADD8E6; --secondary-color: #191970;
+        }
+        /* --- NEW MYSTICAL THEMES --- */
+        .theme-eldarin { /* Elvish: Light Green/Silver */
+            --primary-color: #BADA55; --secondary-color: #D3D3D3;
+            --bg-override: #1E371F; /* Dark Forest Green */
+        }
+        .theme-babylonian { /* Babylonian: Burnt Sienna/Clay */
+            --primary-color: #A0522D; --secondary-color: #D2B48C;
+            --bg-override: #2F170A; /* Deep burnt earth tone */
+        }
+        .theme-pharaoh { /* Egyptian: Lapis/Gold */
+            --primary-color: #FFD700; /* Bright Gold */
+            --secondary-color: #1560BD; /* Lapis Blue */
+            --bg-override: #000000;
+        }
+
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--deep-space);
+            color: var(--text-dark);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 2rem 1rem;
+            
+            /* Enhanced Cosmic Background Pattern */
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(64, 224, 208, 0.1) 0%, transparent 60%),
+                radial-gradient(circle at 90% 80%, rgba(255, 195, 0, 0.1) 0%, transparent 60%),
+                radial-gradient(circle at 50% 50%, rgba(17, 0, 51, 0.9) 0%, #0F0A1E 80%);
+            background-size: 100% 100%;
+        }
+
+        .codex-panel {
+            /* Parchment/Codex Look */
+            background-color: var(--parchment-bg);
+            border: 5px double var(--codex-border); /* Ancient double border */
+            border-radius: 12px;
+            box-shadow: 
+                0 0 50px var(--deep-space), /* Outer shadow for floating effect in space */
+                inset 0 0 20px rgba(0, 0, 0, 0.2); /* Inner shadow for worn effect */
+            max-width: 95%;
+            width: 900px; 
+            padding: 3rem; /* Increased padding for scroll look */
+            position: relative;
+            z-index: 10;
+        }
+        
+        /* Simulating the Scroll/Book Edges */
+        .codex-panel::before, .codex-panel::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 20px;
+            background: rgba(200, 180, 150, 0.8); /* Faded scroll edge color */
+            border-radius: 10px;
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+            z-index: -1;
+        }
+        .codex-panel::before {
+            left: -15px; /* Stick out slightly */
+            transform: skewY(2deg);
+        }
+        .codex-panel::after {
+            right: -15px;
+            transform: skewY(-2deg);
+        }
+
+        .codex-title {
+            color: var(--text-dark);
+            text-shadow: 1px 1px 0 rgba(255, 255, 255, 0.5);
+            font-size: 2.8rem;
+            border-bottom: 3px solid var(--text-dark);
+            padding-bottom: 0.5rem;
+            margin-bottom: 1.5rem;
+            font-family: serif; /* Use a serif font for ancient titles */
+        }
+
+        .input-section, .output-section, .key-container, .theme-controls {
+            margin-bottom: 1.5rem;
+            padding: 1.5rem;
+            border-radius: 8px;
+            background-color: rgba(255, 255, 255, 0.85); /* Slightly brighter interior page */
+            border: 1px solid var(--codex-border);
+        }
+
+        .text-input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border-radius: 4px;
+            border: 2px solid var(--text-dark);
+            background-color: #FFF;
+            color: var(--text-dark); 
+            font-size: 1.2rem;
+            letter-spacing: 1px;
+            font-weight: 500;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+        
+        .text-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 5px var(--primary-color);
+        }
+
+        .glyph-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.25rem; 
+            min-height: 60px;
+            align-items: center;
+            justify-content: flex-start;
+            padding: 1rem;
+            background-color: var(--bg-override); /* Dynamic dark area */
+            border-radius: 8px;
+            box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.8);
+        }
+        
+        .glyph-container .glyph {
+            width: 48px;
+            height: 48px;
+            transition: transform 0.3s, filter 0.3s;
+        }
+
+        .glyph-container .glyph:hover {
+            transform: scale(1.4) rotate(5deg);
+        }
+
+        .button-style {
+            background-color: var(--primary-color);
+            color: var(--deep-space);
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: background-color 0.3s, transform 0.1s, box-shadow 0.3s;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+            border: 1px solid var(--primary-color);
+            cursor: pointer;
+        }
+        
+        .button-style:hover {
+            box-shadow: var(--glow);
+            color: var(--deep-space);
+            transform: translateY(-2px);
+        }
+        .button-style:disabled {
+            background-color: #ccc;
+            border-color: #ccc;
+            box-shadow: none;
+            cursor: not-allowed;
+            color: #666;
+        }
+
+        .key-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(60px, 1fr)); 
+            gap: 0.75rem;
+            max-height: 350px;
+            overflow-y: auto;
+            padding: 1rem;
+            border-radius: 8px;
+            background-color: rgba(255, 255, 255, 0.3);
+            border: 1px solid var(--text-dark);
+        }
+        
+        /* Custom scrollbar matching the theme */
+        .key-grid::-webkit-scrollbar { width: 6px; }
+        .key-grid::-webkit-scrollbar-thumb { background: var(--primary-color); border-radius: 3px; }
+        .key-grid::-webkit-scrollbar-track { background: var(--text-dark); }
+
+        .key-item {
+            padding: 0.5rem;
+            border-radius: 6px;
+            background-color: rgba(255, 255, 255, 0.5);
+            border: 1px solid var(--text-dark);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        /* --- Color Wheel Styles --- */
+        .color-wheel-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            gap: 1rem;
+        }
+        .color-selector {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            border: 4px solid var(--parchment-bg);
+            cursor: pointer;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+            transition: transform 0.2s, box-shadow 0.2s;
+            position: relative;
+        }
+        .color-selector:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 15px var(--primary-color);
+        }
+        .color-selector.active {
+            transform: scale(1.2);
+            border-color: var(--codex-border);
+            box-shadow: 0 0 18px var(--primary-color), 0 0 8px var(--primary-color);
+        }
+        .color-selector span {
+            position: absolute;
+            bottom: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.65rem;
+            font-weight: 600;
+            color: var(--text-dark);
+            white-space: nowrap;
+        }
+
+    </style>
+</head>
+<body class="theme-aetheric">
+
+    <div class="codex-panel">
+        <h1 class="codex-title font-extrabold text-center">
+            THE ALEXANDRIAN CIPHER SCROLL
+        </h1>
+        <p class="text-center text-sm mb-6 font-semibold">
+            The Domrealm Cryptographic Cipher must be transcribed for the Great Library.
+        </p>
+
+        <!-- Color Wheel Selector -->
+        <div class="theme-controls">
+            <h3 class="font-bold text-lg mb-4 text-center">I. MYSTIC ILLUMINATION ARRAY:</h3>
+            <div id="colorWheel" class="color-wheel-container">
+                <!-- Color Selectors will be populated here -->
+            </div>
+        </div>
+
+
+        <!-- Input Area (Scribe Input) -->
+        <div class="input-section">
+            <label for="textInput" class="block text-lg font-bold mb-2">
+                II. MANIFESTATION SEQUENCE (A-Z, 0-9):
+            </label>
+            <input type="text" id="textInput" class="text-input" placeholder="Enter word or number (e.g., DOMREALM CRYPTOGRAPH)">
+        </div>
+
+        <!-- Output Area (Decoded Glyph Scroll) -->
+        <div class="output-section">
+            <h2 class="text-lg font-bold mb-3">
+                III. TRANSCRIBED GLYPHS:
+            </h2>
+            <div id="glyphOutput" class="glyph-container">
+                <p class="text-gray-400 italic text-sm">Glyphs will appear here...</p>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-6 mt-8">
+            <button id="copyButton" class="button-style" disabled>
+                INITIATE SVG DOWNLOAD
+            </button>
+             <button id="toggleKeyButton" class="button-style !bg-transparent !text-text-dark !border !border-text-dark hover:!bg-gray-300 !shadow-none">
+                ACCESS CIPHER KEY
+            </button>
+        </div>
+
+        <!-- Key/Legend (Hidden by Default) -->
+        <div id="keyBox" class="key-container mt-8 hidden">
+            <h3 class="text-lg font-bold mb-3">
+                IV. COSMIC CIPHER KEY:
+            </h3>
+            <div id="glyphKeyContainer" class="key-grid">
+                <!-- Key will be populated by JavaScript -->
+            </div>
+        </div>
+        
+    </div>
+
+    <script>
+        const textInput = document.getElementById('textInput');
+        const glyphOutput = document.getElementById('glyphOutput');
+        const copyButton = document.getElementById('copyButton');
+        const toggleKeyButton = document.getElementById('toggleKeyButton');
+        const keyBox = document.getElementById('keyBox');
+        const glyphKeyContainer = document.getElementById('glyphKeyContainer');
+        const colorWheel = document.getElementById('colorWheel');
+        const body = document.body;
+
+        // --- THEME DEFINITIONS ---
+        const THEMES = [
+            { name: "Aetheric Gold", class: "theme-aetheric", primary: "#FFC300", secondary: "#40E0D0", background: "#0F0A1E" },
+            { name: "Lunar Azure", class: "theme-lunar", primary: "#ADD8E6", secondary: "#191970", background: "#0F0A1E" },
+            { name: "Rune Crimson", class: "theme-rune", primary: "#CD5C5C", secondary: "#4B0082", background: "#0F0A1E" },
+            // New Mystical Themes
+            { name: "Eldarin Scribe", class: "theme-eldarin", primary: "#BADA55", secondary: "#D3D3D3", background: "#1E371F" },
+            { name: "Babylonian Clay", class: "theme-babylonian", primary: "#A0522D", secondary: "#D2B48C", background: "#2F170A" },
+            { name: "Pharaoh's Lapis", class: "theme-pharaoh", primary: "#FFD700", secondary: "#1560BD", background: "#000000" }
+        ];
+
+        // --- Core Glyph Definitions (A-Z, 0-9) ---
+        // (Glyph definitions remain the same, ensuring 'var(--glyph-color)' is used for strokes/fills)
+        const GLYPHS = {
+            'A': () => `<circle cx="50" cy="50" r="15" stroke-width="4" /><line x1="50" y1="50" x2="50" y2="25" stroke-width="4" />`, 
+            'B': () => `<circle cx="50" cy="50" r="15" stroke-width="4" /><line x1="50" y1="50" x2="65" y2="50" stroke-width="4" />`, 
+            'C': () => `<circle cx="50" cy="50" r="15" stroke-width="4" /><line x1="50" y1="50" x2="50" y2="75" stroke-width="4" />`, 
+            'D': () => `<circle cx="50" cy="50" r="15" stroke-width="4" /><line x1="50" y1="50" x2="35" y2="50" stroke-width="4" />`, 
+            'E': () => `<circle cx="50" cy="50" r="15" stroke-width="4" /><line x1="50" y1="50" x2="50" y2="25" stroke-width="4" /><line x1="50" y1="50" x2="65" y2="50" stroke-width="4" />`, 
+            'F': () => `<circle cx="50" cy="50" r="15" stroke-width="4" /><line x1="50" y1="50" x2="65" y2="50" stroke-width="4" /><line x1="50" y1="50" x2="50" y2="75" stroke-width="4" />`, 
+            'G': () => `<circle cx="50" cy="50" r="15" stroke-width="4" /><line x1="50" y1="50" x2="50" y2="75" stroke-width="4" /><line x1="50" y1="50" x2="35" y2="50" stroke-width="4" />`, 
+            'H': () => `<circle cx="50" cy="50" r="15" stroke-width="4" /><line x1="50" y1="50" x2="35" y2="50" stroke-width="4" /><line x1="50" y1="50" x2="50" y2="25" stroke-width="4" />`, 
+            'I': () => `<circle cx="50" cy="50" r="20" stroke-width="4" /><circle cx="50" cy="50" r="10" fill="var(--glyph-color)" stroke="none" />`, 
+            'J': () => `<circle cx="50" cy="50" r="20" stroke-width="4" /><circle cx="50" cy="50" r="10" stroke-width="4" />`, 
+            'K': () => `<circle cx="50" cy="50" r="20" stroke-width="4" /><line x1="30" y1="50" x2="70" y2="50" stroke-width="4" />`, 
+            'L': () => `<circle cx="50" cy="50" r="20" stroke-width="4" /><line x1="50" y1="30" x2="50" y2="70" stroke-width="4" />`, 
+            'M': () => `<circle cx="50" cy="50" r="15" stroke-width="4" /><polygon points="50 25, 75 75, 25 75" fill="none" stroke="var(--glyph-color)" stroke-width="4" />`, 
+            'N': () => `<circle cx="50" cy="50" r="15" stroke-width="4" /><polygon points="50 75, 75 25, 25 25" fill="none" stroke="var(--glyph-color)" stroke-width="4" />`, 
+            'O': () => `<circle cx="50" cy="50" r="20" stroke-width="4" />`, 
+            'P': () => `<circle cx="50" cy="50" r="20" stroke-width="4" /><line x1="25" y1="50" x2="75" y2="50" stroke-width="4" /><line x1="50" y1="25" x2="50" y2="75" stroke-width="4" />`, 
+            'Q': () => `<path d="M 50 50 L 70 30 A 28 28 0 0 0 30 30 Z" fill="none" stroke="var(--glyph-color)" stroke-width="4" />`, 
+            'R': () => `<path d="M 50 50 L 70 70 A 28 28 0 0 0 30 70 Z" fill="none" stroke="var(--glyph-color)" stroke-width="4" />`, 
+            'S': () => `<path d="M 70 50 A 20 20 0 1 1 50 30 L 50 70" fill="none" stroke="var(--glyph-color)" stroke-width="4" />`, 
+            'T': () => `<path d="M 30 50 A 20 20 0 0 1 50 30 L 50 70" fill="none" stroke="var(--glyph-color)" stroke-width="4" />`, 
+            'U': () => `<circle cx="50" cy="50" r="10" stroke-width="4" /><circle cx="50" cy="50" r="4" fill="var(--glyph-color)" stroke="none" />`, 
+            'V': () => `<circle cx="40" cy="50" r="6" fill="var(--glyph-color)" stroke="none" /><circle cx="60" cy="50" r="6" fill="var(--glyph-color)" stroke="none" /><line x1="40" y1="50" x2="60" y2="50" stroke-width="4" />`, 
+            'W': () => `<circle cx="50" cy="50" r="15" stroke-width="4" /><circle cx="40" cy="40" r="4" fill="var(--glyph-color)" stroke="none" /><circle cx="60" cy="40" r="4" fill="var(--glyph-color)" stroke="none" />`, 
+            'X': () => `<circle cx="50" cy="50" r="20" stroke-width="4" /><line x1="35" y1="35" x2="65" y2="65" stroke-width="4" /><line x1="65" y1="35" x2="35" y2="65" stroke-width="4" />`, 
+            'Y': () => `<circle cx="50" cy="50" r="20" fill="none" stroke-width="4" /><line x1="50" y1="20" x2="50" y2="50" stroke-width="4" />`, 
+            'Z': () => `<circle cx="50" cy="50" r="20" fill="none" stroke-width="4" /><circle cx="50" cy="50" r="6" fill="var(--glyph-color)" stroke="none" />`,
+
+            // --- Number Glyphs (0-9) ---
+            '0': () => `<circle cx="50" cy="50" r="20" stroke-width="4" /><line x1="30" y1="50" x2="70" y2="50" stroke-width="2" />`,
+            '1': () => `<circle cx="50" cy="50" r="20" stroke-width="4" /><line x1="50" y1="30" x2="50" y2="70" stroke-width="4" />`,
+            '2': () => `<circle cx="50" cy="50" r="20" stroke-width="4" /><line x1="50" y1="50" x2="65" y2="35" stroke-width="4" /><line x1="50" y1="50" x2="35" y2="65" stroke-width="4" />`,
+            '3': () => `<circle cx="50" cy="50" r="20" stroke-width="4" /><polygon points="50 30, 70 50, 50 70, 30 50" fill="none" stroke="var(--glyph-color)" stroke-width="4" />`,
+            '4': () => `<circle cx="50" cy="50" r="20" stroke-width="4" /><rect x="30" y="30" width="40" height="40" fill="none" stroke="var(--glyph-color)" stroke-width="4" />`,
+            '5': () => `<circle cx="50" cy="50" r="20" stroke-width="4" /><path d="M 50 50 L 68 56 L 62 76 L 38 76 L 32 56 Z" fill="none" stroke="var(--glyph-color)" stroke-width="4" />`,
+            '6': () => `<circle cx="50" cy="50" r="20" stroke-width="4" /><path d="M 50 30 L 70 40 L 70 60 L 50 70 L 30 60 L 30 40 Z" fill="none" stroke="var(--glyph-color)" stroke-width="4" />`,
+            '7': () => `<circle cx="50" cy="50" r="20" stroke-width="4" /><circle cx="50" cy="50" r="10" stroke-width="4" /><line x1="25" y1="50" x2="75" y2="50" stroke-width="2" />`,
+            '8': () => `<circle cx="50" cy="35" r="10" stroke-width="3" /><circle cx="50" cy="65" r="10" stroke-width="3" /><line x1="50" y1="25" x2="50" y2="75" stroke-width="1.5" />`,
+            '9': () => `<circle cx="50" cy="50" r="20" stroke-width="4" /><polygon points="50 30, 65 65, 35 65" fill="var(--glyph-color)" stroke="none" />`,
+        };
+
+        const SPACE_GLYPH = `<rect x="30" y="30" width="40" height="40" fill="none" stroke="var(--secondary-color)" stroke-width="2" stroke-dasharray="4 4" opacity="0.5" />`;
+
+        /**
+         * Generates the SVG string for a given character.
+         */
+        function generateSvg(char) {
+            let innerSvg = '';
+            let isSpace = false;
+            const key = char.toUpperCase();
+
+            if (key === ' ') {
+                innerSvg = SPACE_GLYPH;
+                isSpace = true;
+            } else if (GLYPHS[key]) {
+                innerSvg = GLYPHS[key]();
+            } else {
+                return ''; 
+            }
+
+            const outerCircle = isSpace ? '' : `<circle cx="50" cy="50" r="24" stroke="var(--secondary-color)" stroke-width="1.5" fill="none" opacity="0.2" />`;
+
+            return `
+                <svg viewBox="0 0 100 100" class="glyph w-full h-full" xmlns="http://www.w3.org/2000/svg">
+                    ${outerCircle}
+                    <g stroke="var(--glyph-color)" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        ${innerSvg}
+                    </g>
+                </svg>
+            `;
+        }
+
+        /**
+         * Updates the displayed glyph code based on the input text.
+         */
+        function updateGlyphCode() {
+            const rawText = textInput.value;
+            // Cryptographic trigger
+            if (rawText.toLowerCase().includes("domrealmcryptographic cipher text")) {
+                textInput.value = "DOMREALM CRYPTOGRAPH";
+            }
+
+            const cleanText = textInput.value.toUpperCase().slice(0, 50).replace(/[^A-Z0-9\s]/g, ''); 
+            textInput.value = cleanText;
+
+            const glyphs = [];
+            let fullSvgCode = '';
+            const activeGlow = `drop-shadow(0 0 4px var(--primary-color))`;
+
+            if (cleanText.length === 0) {
+                glyphOutput.innerHTML = `<p class="text-gray-400 italic text-sm">Glyphs will appear here...</p>`;
+                copyButton.disabled = true;
+                return;
+            }
+
+            for (let i = 0; i < cleanText.length; i++) {
+                const char = cleanText[i];
+                const svgString = generateSvg(char);
+                if (svgString) {
+                    const svgWrapper = `<div class="glyph" title="${char}" style="filter: ${activeGlow};">${svgString}</div>`;
+                    glyphs.push(svgWrapper);
+                    
+                    const xOffset = i * 100; 
+                    const translatedSvg = svgString
+                        .replace('class="glyph w-full h-full"', '')
+                        .replace('<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">', 
+                                 `<svg x="${xOffset}" y="0" width="100" height="100">`)
+                        .replace('</svg>', '</svg>');
+
+                    fullSvgCode += translatedSvg;
+                }
+            }
+
+            glyphOutput.innerHTML = glyphs.join('');
+            copyButton.disabled = false;
+            copyButton.setAttribute('data-svg', fullSvgCode);
+            updateButtonStyles();
+        }
+
+        /**
+         * Updates all dynamically styled elements based on the current theme.
+         */
+        function updateButtonStyles() {
+            const root = document.documentElement;
+            const primaryColor = root.style.getPropertyValue('--primary-color');
+            const secondaryColor = root.style.getPropertyValue('--secondary-color');
+            const bgOverride = root.style.getPropertyValue('--bg-override');
+            
+            // Update glow variable
+            root.style.setProperty('--glow', `0 0 10px ${primaryColor}, 0 0 20px ${primaryColor}4D`);
+            
+            // Update primary button style
+            copyButton.style.backgroundColor = primaryColor;
+            copyButton.style.borderColor = primaryColor;
+            
+            // Update secondary button style
+            toggleKeyButton.style.borderColor = `var(--text-dark)`;
+
+            // Update glyph container background
+            document.querySelector('.glyph-container').style.backgroundColor = bgOverride;
+            
+            // Update glyph glow in output area
+            const activeGlow = `drop-shadow(0 0 4px ${primaryColor})`;
+            document.querySelectorAll('.glyph-container .glyph').forEach(glyph => {
+                glyph.style.filter = activeGlow;
+            });
+            
+            // Update the active color wheel selector's shadow to use the current primary color
+            document.querySelectorAll('.color-selector').forEach(sel => {
+                sel.style.boxShadow = `0 0 5px rgba(0, 0, 0, 0.5)`;
+                if (sel.classList.contains('active')) {
+                     sel.style.boxShadow = `0 0 18px ${primaryColor}, 0 0 8px ${primaryColor}`;
+                }
+            });
+
+
+            // Re-populate key to update its colors
+            if (!keyBox.classList.contains('hidden')) {
+                populateGlyphKey();
+            }
+        }
+
+        /**
+         * Populates the Glyph Key section.
+         */
+        function populateGlyphKey() {
+            glyphKeyContainer.innerHTML = ''; // Clear existing
+            const fragment = document.createDocumentFragment();
+            const keys = Object.keys(GLYPHS).sort((a, b) => {
+                const aIsNum = !isNaN(a);
+                const bIsNum = !isNaN(b);
+
+                if (aIsNum && bIsNum) return a - b;
+                if (aIsNum) return 1;
+                if (bIsNum) return -1;
+                return a.localeCompare(b);
+            });
+
+            keys.forEach(key => {
+                const svgString = generateSvg(key);
+
+                const item = document.createElement('div');
+                item.className = 'key-item flex flex-col items-center p-1 rounded-lg transition';
+                item.innerHTML = `
+                    <div class="w-10 h-10 flex items-center justify-center">
+                        ${svgString}
+                    </div>
+                    <span class="text-xs mt-1 font-mono font-bold" style="color: var(--text-dark);">${key}</span>
+                `;
+                fragment.appendChild(item);
+            });
+
+            glyphKeyContainer.appendChild(fragment);
+        }
+
+        /**
+         * Copies the generated SVG code (wrapped for external use) to the clipboard.
+         */
+        function copyToClipboard() {
+            const svgContent = copyButton.getAttribute('data-svg');
+            const cleanTextLength = textInput.value.toUpperCase().replace(/[^A-Z0-9\s]/g, '').length;
+            const viewBoxWidth = cleanTextLength * 100;
+            const root = document.documentElement;
+            const currentPrimaryColor = root.style.getPropertyValue('--primary-color').trim();
+            const currentSecondaryColor = root.style.getPropertyValue('--secondary-color').trim();
+            const currentBGOverride = root.style.getPropertyValue('--bg-override').trim();
+
+
+            if (viewBoxWidth === 0) return;
+
+            // Final SVG wrapper including embedded CSS for portability
+            const finalSvgWrapper = `
+<svg viewBox="0 0 ${viewBoxWidth} 100" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+        <style>
+            .glyph-group g {
+                stroke: ${currentPrimaryColor};
+                fill: none;
+                stroke-linecap: round;
+                stroke-linejoin: round;
+                filter: drop-shadow(0 0 3px ${currentPrimaryColor});
+            }
+            .glyph-group circle[fill='var(--glyph-color)'] {
+                fill: ${currentPrimaryColor};
+            }
+            .glyph-group polygon[fill='var(--glyph-color)'] {
+                fill: ${currentPrimaryColor};
+            }
+            .space-glyph {
+                stroke: ${currentSecondaryColor};
+                stroke-dasharray: 4 4;
+            }
+        </style>
+    </defs>
+    <rect width="${viewBoxWidth}" height="100" fill="${currentBGOverride}"/>
+    <g class="glyph-group">
+        ${svgContent
+            .replaceAll('<svg x=', `<g transform="translate(`)
+            .replaceAll('</svg><svg', `</g></g><g class="glyph-group">`)
+            .replaceAll('</svg>', `</g></g>`)
+            .replaceAll('<rect', '<rect class="space-glyph"')
+            // Clean up internal var references for static SVG output
+            .replaceAll('var(--glyph-color)', currentPrimaryColor) 
+            .replaceAll('var(--secondary-color)', currentSecondaryColor)
+        }
+    </g>
+</svg>`;
+
+            const tempInput = document.createElement('textarea');
+            tempInput.value = finalSvgWrapper.trim(); 
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+
+            copyButton.textContent = 'CODE COPIED!';
+            setTimeout(() => {
+                copyButton.textContent = 'INITIATE SVG DOWNLOAD';
+            }, 1500);
+        }
+
+        /**
+         * Toggles the visibility of the Glyph Key.
+         */
+        function toggleKey() {
+            keyBox.classList.toggle('hidden');
+            if (keyBox.classList.contains('hidden')) {
+                toggleKeyButton.textContent = 'ACCESS CIPHER KEY';
+            } else {
+                toggleKeyButton.textContent = 'HIDE CIPHER KEY';
+                populateGlyphKey();
+            }
+        }
+        
+        /**
+         * Populates and handles theme selection via the color wheel.
+         */
+        function setupColorWheel() {
+            colorWheel.innerHTML = '';
+            const fragment = document.createDocumentFragment();
+
+            THEMES.forEach(theme => {
+                const selector = document.createElement('div');
+                selector.className = `color-selector ${theme.class}`;
+                selector.setAttribute('data-theme', theme.class);
+                selector.style.backgroundColor = theme.primary;
+                selector.style.borderColor = theme.secondary; 
+                selector.innerHTML = `<span>${theme.name.split(' ')[0]}</span>`; 
+
+                selector.addEventListener('click', () => {
+                    handleThemeChange(theme.class);
+                });
+                fragment.appendChild(selector);
+            });
+
+            colorWheel.appendChild(fragment);
+            // Initialize to the default theme
+            handleThemeChange(THEMES[0].class); 
+        }
+
+        /**
+         * Handles theme change.
+         */
+        function handleThemeChange(newThemeClass) {
+            const root = document.documentElement;
+            let selectedTheme;
+
+            // Find the theme object
+            for (let theme of THEMES) {
+                if (theme.class === newThemeClass) {
+                    selectedTheme = theme;
+                    break;
+                }
+            }
+            if (!selectedTheme) return;
+
+            // 1. Update the body class
+            body.className = ''; 
+            body.classList.add(selectedTheme.class);
+
+            // 2. Set CSS variables globally for instant styling
+            root.style.setProperty('--primary-color', selectedTheme.primary);
+            root.style.setProperty('--secondary-color', selectedTheme.secondary);
+            root.style.setProperty('--bg-override', selectedTheme.background);
+            
+            // 3. Update active state on the color wheel
+            document.querySelectorAll('.color-selector').forEach(sel => {
+                sel.classList.remove('active');
+            });
+            document.querySelector(`[data-theme="${newThemeClass}"]`).classList.add('active');
+
+            // 4. Re-render glyphs and styles
+            updateGlyphCode(); 
+        }
+
+
+        // --- Event Listeners and Initialization ---
+        textInput.addEventListener('input', updateGlyphCode);
+        copyButton.addEventListener('click', copyToClipboard);
+        toggleKeyButton.addEventListener('click', toggleKey);
+
+        setupColorWheel();
+    </script>
+</body>
+</html>
+
