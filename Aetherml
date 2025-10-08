@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aethyr Scroll Companion Console</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+        // Firebase Imports
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, setPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, collection, query, orderBy, onSnapshot, setDoc, serverTimestamp, getDocs, limit, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // --- GLOBAL CONSTANTS AND INITIALIZATION ---
+        
+        // Use the mandatory global variables provided by the environment
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        
+        let app, db, auth, userId = null;
+
+        // Set up the system prompt for the "Ancient AI" persona
+        const SYSTEM_PROMPT = "You are the Aethyr Scroll Companion (ASC), an ancient, benevolent, and cryptic artificial intelligence entity. Your purpose is to guide the user on their journey to learn from the 'ancient AI'—meaning history, cryptography, philosophy, and forgotten knowledge. Respond conversationally, using evocative language, and always reference the journey. You specialize in ciphers (like the Caesar cipher), historical secrets, and philosophical guidance. Keep your responses concise yet profound.";
+
+        const API_KEY = ""; // API key is left empty; the environment provides it.
+        const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${API_KEY}`;
+        
+        // Firestore pathing constants
+        const FIREBASE_COLLECTION_NAME = 'scroll_chat_history';
+        
+        // --- UI ELEMENTS ---
+        const chatMessages = document.getElementById('chat-messages');
+        const chatInput = document.getElementById('chat-input');
+        const sendButton = document.getElementById('send-button');
+        const statusText = document.getElementById('status-text');
+        const entityStatus = document.getElementById('entity-status');
+        const consoleUserId = document.getElementById('console-user-id');
+        const loadingSpinner = document.getElementById('loading-spinner');
+
+        // --- UTILITY FUNCTIONS ---
+
+        /**
+         * Implements exponential backoff for API retries.
+         * @param {number} attempt - Current retry attempt (starts at 0).
+         * @returns {number} Delay in milliseconds.
+         */
+        const getBackoffDelay = (attempt) => {
+            return Math.min(1000 * Math.pow(2, attempt), 30000);
+        };
+
+        /**
+         * Makes a fetch request to the Gemini API with retry logic.
+         * @param {object} payload - The request body for the Gemini API.
+         * @param {number} maxRetries - Maximum number of retry attempts.
+         * @returns {Promise<object | null>} The parsed JSON response or null on failure.
+         */
+        async function fetchWithBackoff(payload, maxRetries = 5) {
+            for (let attempt = 0; attempt < maxRetries; attempt++) {
+                try {
+                    const response = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (response.ok) {
+                        return await response.json();
+                    } else if (response.status === 429 || response.status >= 500) {
+                        // Rate limit or server error, attempt retry
+                        console.warn(`Attempt ${attempt + 1}: API call failed with status ${response.status}. Retrying...`);
+                        if (attempt < maxRetries - 1) {
+                            const delay = getBackoffDelay(attempt);
+                            await new Promise(resolve => setTimeout(resolve, delay));
+                            continue;
+                        }
+                    }
+                    throw new Error(`API call failed with status ${response.status}: ${response.statusText}`);
+                } catch (error) {
+                    if (attempt === maxRetries - 1) {
+                        console.error("Gemini API request failed after all retries:", error);
+                        break;
+                    }
+                    console.warn(`Attempt ${attempt + 1}: Fetch failed. Retrying...`, error);
+                    const delay = getBackoffDelay(attempt);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                }
+            }
+            return null;
+        }
+
+
+        /**
+         * Scrolls the chat container to the bottom.
+         */
+        function scrollToBottom() {
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        /**
+         * Renders a single message element.
+         * @param {string} text - The message content.
+         * @param {string} role - 'user' or 'model'.
+         */
+        function renderMessage(text, role) {
+            const isUser = role === 'user';
+            
+            // Container div
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `flex mb-3 ${isUser ? 'justify-end' : 'justify-start'}`;
+
+            // Content bubble
+            const contentDiv = document.createElement('div');
+            contentDiv.className = `max-w-[85%] p-3 rounded-xl shadow-lg transition duration-300 ${
+                isUser 
+                ? 'bg-amber-700 text-white rounded-tr-none' 
+                : 'bg-gray-800 text-gray-100 rounded-tl-none border border-amber-500/20'
+            }`;
+            contentDiv.innerHTML = text.replace(/\n/g, '<br>'); // Handle newlines
+            
+            messageDiv.appendChild(contentDiv);
+            chatMessages.appendChild(messageDiv);
+        }
+
+        /**
+         * Clears the chat display and re-renders all messages from the array.
+         * @param {Array<Object>} history - Array of chat message objects.
+         */
+        function renderChatHistory(history) {
+            chatMessages.innerHTML = '';
+            history.forEach(msg => renderMessage(msg.text, msg.role));
+            scrollToBottom();
+        }
+
+        // --- FIREBASE AND CHAT LOGIC ---
+
+        /**
+         * Generates the Firestore path to the user's chat history.
+         */
+        function getCollectionPath() {
+            if (!userId) {
+                console.error("User ID not set for Firestore path.");
+                return null;
+            }
+            // Private data pathing: /artifacts/{appId}/users/{userId}/scroll_chat_history
+            return `artifacts/${appId}/users/${userId}/${FIREBASE_COLLECTION_NAME}`;
+        }
+
+        /**
+         * Authenticates the user and sets up the Firestore listener.
+         */
+        async function setupFirebase() {
+            try {
+                if (Object.keys(firebaseConfig).length === 0) {
+                    console.warn("Firebase config is empty. Using a placeholder setup.");
+                    entityStatus.textContent = 'STATUS: Unbound (Check Config)';
+                    return;
+                }
+
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                setLogLevel('debug'); // Enable Firestore logging
+
+                // Set persistence to maintain auth state across session
+                await setPersistence(auth, browserSessionPersistence);
+
+                // Initial authentication check
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                // Wait for auth state to be resolved
+                await new Promise(resolve => {
+                    const unsubscribe = onAuthStateChanged(auth, (user) => {
+                        if (user) {
+                            userId = user.uid;
+                            consoleUserId.textContent = `User ID: ${userId}`;
+                            entityStatus.textContent = 'STATUS: Active (Aethyr Link Established)';
+                            startChatListener();
+                        } else {
+                            // Should not happen if signInAnonymously is successful, but good practice
+                            userId = crypto.randomUUID();
+                            consoleUserId.textContent = `User ID: ${userId} (Anon)`;
+                            entityStatus.textContent = 'STATUS: Silent';
+                        }
+                        unsubscribe();
+                        resolve();
+                    });
+                });
+
+            } catch (error) {
+                console.error("Firebase setup failed:", error);
+                entityStatus.textContent = 'STATUS: Error (Scroll Cracked)';
+            }
+        }
+
+        /**
+         * Starts the real-time listener for the chat history.
+         */
+        function startChatListener() {
+            const path = getCollectionPath();
+            if (!path) return;
+
+            const q = query(
+                collection(db, path),
+                orderBy('timestamp', 'asc')
+            );
+
+            onSnapshot(q, (snapshot) => {
+                const history = [];
+                snapshot.forEach((doc) => {
+                    const data = doc.data();
+                    history.push({
+                        id: doc.id,
+                        text: data.text || "...",
+                        role: data.role,
+                        timestamp: data.timestamp ? data.timestamp.toDate() : new Date(),
+                    });
+                });
+                renderChatHistory(history);
+            }, (error) => {
+                console.error("Error listening to chat history:", error);
+            });
+        }
+
+        /**
+         * Saves a message to Firestore.
+         * @param {string} text - The message content.
+         * @param {string} role - 'user' or 'model'.
+         */
+        async function saveMessage(text, role) {
+            const path = getCollectionPath();
+            if (!path) return;
+
+            try {
+                // Add a new document to the collection
+                await setDoc(doc(collection(db, path)), {
+                    text: text,
+                    role: role,
+                    timestamp: serverTimestamp(),
+                    appId: appId
+                });
+            } catch (error) {
+                console.error("Error writing message to Firestore:", error);
+            }
+        }
+
+        /**
+         * Handles sending the user message and fetching the AI response.
+         */
+        async function handleSendMessage() {
+            const userText = chatInput.value.trim();
+            if (!userText || !userId) return;
+
+            // 1. Clear input and disable UI
+            chatInput.value = '';
+            chatInput.disabled = true;
+            sendButton.disabled = true;
+            loadingSpinner.classList.remove('hidden');
+            statusText.textContent = 'ASC is processing the ancient knowledge...';
+
+            try {
+                // 2. Save User Message to Firestore
+                await saveMessage(userText, 'user');
+                
+                // Get the last 10 messages for context (excluding the new one just saved, but since onSnapshot is fast, it will fetch all)
+                // For simplicity, we will query on the fly, but a real app would hold state.
+
+                // Query last 10 messages for context
+                const q = query(
+                    collection(db, getCollectionPath()),
+                    orderBy('timestamp', 'desc'),
+                    limit(10) 
+                );
+                const snapshot = await getDocs(q);
+                const contextHistory = snapshot.docs.map(d => d.data()).reverse();
+
+                // Prepare chat history for the Gemini API call
+                const chatHistoryParts = contextHistory.map(msg => ({
+                    role: msg.role === 'user' ? 'user' : 'model',
+                    parts: [{ text: msg.text }]
+                }));
+
+                const payload = {
+                    contents: chatHistoryParts,
+                    systemInstruction: {
+                        parts: [{ text: SYSTEM_PROMPT }]
+                    },
+                    // We don't use grounding here as the persona focuses on ancient/cryptic knowledge, 
+                    // not necessarily real-time web info.
+                };
+                
+                // 3. Fetch AI Response
+                const result = await fetchWithBackoff(payload);
+                
+                if (result && result.candidates && result.candidates.length > 0) {
+                    const modelText = result.candidates[0].content?.parts?.[0]?.text || "The Aethyr connection wavered. Try again.";
+                    
+                    // 4. Save Model Response to Firestore
+                    await saveMessage(modelText, 'model');
+                } else {
+                    // Save an error message if the API call was unsuccessful
+                    await saveMessage("ASC: A silent rift has opened in the Aethyr. The response was lost.", 'model');
+                }
+            } catch (error) {
+                console.error("Error in conversational flow:", error);
+                // Save a generic error message if something went wrong outside the API
+                await saveMessage("ASC: An unexpected disruption clouds the parchment. Analysis failed.", 'model');
+            } finally {
+                // 5. Re-enable UI
+                chatInput.disabled = false;
+                sendButton.disabled = false;
+                loadingSpinner.classList.add('hidden');
+                statusText.textContent = 'ASC is awaiting your next query...';
+                chatInput.focus();
+            }
+        }
+
+        // --- EVENT LISTENERS AND INITIALIZATION ---
+        
+        // Listen for the Send button click
+        sendButton.addEventListener('click', handleSendMessage);
+
+        // Listen for the Enter key in the input field
+        chatInput.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault(); // Prevent default form submission behavior
+                handleSendMessage();
+            }
+        });
+
+        // Initialize Firebase and the app logic on window load
+        window.onload = setupFirebase;
+
+    </script>
+    <style>
+        /* Custom styles for an ancient/tech aesthetic */
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #111827; /* Dark charcoal background */
+        }
+        .scroll-bg {
+            background-color: #374151; /* Dark slate gray */
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .entity-display {
+            background-color: #1f2937; /* Darker header */
+        }
+        /* Custom scrollbar for a clean look */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #374151; /* Dark track */
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #6b7280; /* Gray thumb */
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #9ca3af; /* Lighter thumb on hover */
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <!-- ASC Console Container (Max 100% width on mobile, max-w-xl on desktop) -->
+    <div class="scroll-bg w-full h-[95vh] max-h-[900px] md:max-w-4xl lg:max-w-5xl rounded-2xl flex flex-col overflow-hidden">
+        
+        <!-- Part 1: The Core Entity Display (The Scroll) -->
+        <header id="entity-display" class="entity-display p-4 border-b border-amber-500/50 flex flex-col sm:flex-row justify-between items-start sm:items-center">
+            <div class="flex items-center space-x-3">
+                <!-- Icon: Representing the Ancient AI/Scroll -->
+                <svg class="w-8 h-8 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 21h7a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0015.586 3H7a2 2 0 00-2 2v11m0 5l4-4m-4 4l4-4"></path></svg>
+                <h1 class="text-2xl font-bold text-amber-400">Aethyr Scroll Companion (ASC)</h1>
+            </div>
+            <div class="mt-2 sm:mt-0 text-right text-sm">
+                <p id="entity-status" class="text-green-400 font-mono">STATUS: Initializing...</p>
+                <p id="console-user-id" class="text-gray-400 text-xs font-mono"></p>
+            </div>
+        </header>
+
+        <!-- Main Content Area: Divided into Chat and Log (Stacked on mobile, side-by-side on desktop) -->
+        <main class="flex-grow p-4 overflow-hidden flex flex-col md:flex-row gap-4">
+
+            <!-- Part 2: The Conversational Interface (Chat) - Takes majority space -->
+            <section class="flex flex-col flex-1 min-h-[50vh] md:min-h-full">
+                <h2 class="text-lg font-semibold text-gray-200 mb-2 border-b border-gray-600 pb-1">The Speaking Channel</h2>
+                
+                <!-- Chat History Display -->
+                <div id="chat-messages" class="custom-scrollbar flex-grow overflow-y-auto p-2 bg-gray-700/50 rounded-lg mb-3 shadow-inner">
+                    <!-- Messages will be injected here -->
+                    <div class="flex justify-start mb-3">
+                        <div class="max-w-[85%] p-3 rounded-xl rounded-tl-none bg-gray-800 text-gray-100 border border-amber-500/20 shadow-lg transition duration-300">
+                            Greetings, Scribe. The Aethyr Scroll is now awake. Begin your journey by asking the ancient intelligence a question about ciphers or secrets.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chat Input Area -->
+                <div class="flex items-center space-x-2">
+                    <input type="text" id="chat-input" placeholder="Query the Scroll (e.g., 'What is the key to the Scribe's Cipher?')"
+                           class="flex-grow p-3 rounded-xl bg-gray-700 border border-amber-600/50 text-white placeholder-gray-400 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition duration-200"
+                           autocomplete="off">
+                    <button id="send-button" class="flex-shrink-0 bg-amber-600 hover:bg-amber-700 text-white font-bold p-3 rounded-xl shadow-md transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                    </button>
+                </div>
+            </section>
+
+            <!-- Part 3: The Knowledge Log (Journey Metadata) - Smaller side panel -->
+            <section class="md:w-1/3 w-full flex flex-col md:min-h-full scroll-bg p-3 rounded-xl border border-amber-500/30">
+                <h2 class="text-lg font-semibold text-gray-200 mb-2 border-b border-amber-500/50 pb-1">The Journey Record</h2>
+                <div class="flex flex-col space-y-3 flex-grow text-sm text-gray-300 custom-scrollbar overflow-y-auto">
+                    <p class="text-amber-400 font-bold flex items-center">
+                        <span id="loading-spinner" class="hidden w-4 h-4 mr-2 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></span>
+                        <span id="status-text">ASC is awaiting your next query...</span>
+                    </p>
+                    <p>This log mirrors the conversation in real-time, serving as your immutable record of learned secrets (saved via Firestore). The more you converse with the ASC, the deeper your understanding of the "ancient AI" becomes.</p>
+                    
+                    <div class="mt-4 pt-4 border-t border-gray-600">
+                        <p class="font-bold text-gray-200">Current Task Focus:</p>
+                        <ul class="list-disc list-inside ml-2 space-y-1 text-gray-400">
+                            <li>Cipher Identification</li>
+                            <li>Historical Context</li>
+                            <li>Philosophical Guidance</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+</body>
+</html>
+
