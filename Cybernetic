@@ -1,0 +1,13 @@
+DECLARE
+    // Defines the alphabet to be used for shifting.
+    ALPHA: ['A'..'Z']
+    
+    // Defines the shift amount for a Caesar cipher.
+    SHIFT: 4 
+    
+    // Defines the message to be processed.
+    MSG: "CRYPTOGRAPHY"
+    
+    // Optional: Defines a repeating keystream for polyalphabetic ciphers.
+    KEY: "SCRIBE" 
+END DECLARE
